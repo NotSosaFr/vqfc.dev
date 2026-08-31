@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vqfc</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #050505;
+      --surface: #0a0a0a;
+      --surface-hover: #111111;
+      --border: #1a1a1a;
+      --text: #ffffff;
+      --text-dim: #888888;
+      --text-faint: #444444;
+      --accent-blue: #3b82f6;
+      --accent-blue-soft: rgba(59, 130, 246, 0.15);
+      --accent-gold: #f59e0b;
+      --accent-gold-soft: rgba(245, 158, 11, 0.15);
+      --accent-purple: #a855f7;
+      --accent-purple-soft: rgba(168, 85, 247, 0.15);
+      --accent-red: #ef4444;
+      --accent-red-soft: rgba(239, 68, 68, 0.15);
+      --discord: #5865F2;
+      --discord-soft: rgba(88, 101, 242, 0.15);
+      --radius: 12px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    #trail-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #spotlight {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+      background: radial-gradient(
+        500px circle at var(--mx, 50%) var(--my, 50%),
+        rgba(255, 255, 255, 0.035),
+        transparent 60%
+      );
+      transition: background 0.1s ease;
+    }
+
+    .card {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      padding: 48px 32px;
+      max-width: 420px;
+      width: 90%;
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .avatar-wrap {
+      position: relative;
+      display: inline-block;
+      margin-bottom: 20px;
+    }
+    .avatar-ring {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+      background: var(--surface);
+    }
+    .avatar-ring::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent, var(--text-faint), transparent, var(--text-faint), transparent);
+      animation: spin 4s linear infinite;
+      z-index: -1;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+
+    .name {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+    .handle {
+      font-size: 14px;
+      color: var(--text-dim);
+      font-weight: 400;
+      margin-bottom: 16px;
+    }
+
+    .badges {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: default;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .badge:hover {
+      transform: translateY(-3px) scale(1.08);
+      border-color: var(--text-faint);
+    }
+    .badge svg { width: 18px; height: 18px; }
+
+    .badge::after {
+      content: attr(data-label);
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: var(--surface-hover);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 10;
+    }
+    .badge:hover::after {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .badge-owner { color: var(--accent-red); border-color: var(--accent-red-soft); }
+    .badge-owner:hover { background: var(--accent-red-soft); box-shadow: 0 0 20px var(--accent-red-soft); }
+    .badge-dev { color: var(--accent-purple); border-color: var(--accent-purple-soft); }
+    .badge-dev:hover { background: var(--accent-purple-soft); box-shadow: 0 0 20px var(--accent-purple-soft); }
+    .badge-vip { color: var(--accent-gold); border-color: var(--accent-gold-soft); }
+    .badge-vip:hover { background: var(--accent-gold-soft); box-shadow: 0 0 20px var(--accent-gold-soft); }
+    .badge-verified { color: var(--accent-blue); border-color: var(--accent-blue-soft); }
+    .badge-verified:hover { background: var(--accent-blue-soft); box-shadow: 0 0 20px var(--accent-blue-soft); }
+
+    .discord-section {
+      position: relative;
+      margin-bottom: 20px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      text-align: left;
+      transition: border-color 0.25s ease;
+    }
+
+    .discord-banner {
+      width: 100%;
+      height: 120px;
+      background-size: cover;
+      background-position: center;
+      position: relative;
+    }
+    .discord-banner img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .discord-body {
+      padding: 0 16px 16px;
+      position: relative;
+    }
+
+    .discord-avatar-wrap {
+      position: relative;
+      margin-top: -32px;
+      margin-bottom: 10px;
+      display: inline-block;
+    }
+    .discord-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 4px solid var(--surface);
+      background: var(--surface);
+      object-fit: cover;
+      display: block;
+    }
+    .discord-status {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #23a559;
+      border: 3px solid var(--surface);
+    }
+
+    .discord-name {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .discord-username {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+
+    .discord-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 10px 0;
+    }
+
+    .discord-id-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .discord-id-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    .discord-id-value {
+      font-size: 12px;
+      color: var(--text-faint);
+      font-family: var(--font-mono, monospace);
+    }
+
+    .discord-link {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+    }
+    .discord-link:hover .discord-section {
+      border-color: var(--discord);
+    }
+
+    .links {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .link-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 20px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      font-family: inherit;
+    }
+    .link-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent);
+      transform: translateX(-100%);
+      transition: transform 0.5s ease;
+    }
+    .link-btn:hover::before { transform: translateX(100%); }
+    .link-btn:hover {
+      border-color: var(--text-faint);
+      background: var(--surface-hover);
+      transform: translateY(-1px);
+    }
+
+    .link-btn .sweep {
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 60%;
+      height: 100%;
+      background: linear-gradient(90deg,
+        rgba(255, 0, 0, 0),
+        rgba(255, 0, 0, 0.55),
+        rgba(255, 127, 0, 0.55),
+        rgba(255, 255, 0, 0.55),
+        rgba(0, 255, 0, 0.55),
+        rgba(0, 255, 255, 0.55),
+        rgba(0, 0, 255, 0.55),
+        rgba(148, 0, 211, 0.55),
+        rgba(255, 0, 0, 0)
+      );
+      filter: blur(6px);
+      opacity: 0;
+      pointer-events: none;
+      border-radius: var(--radius);
+    }
+    .link-btn.rainbow .sweep {
+      animation: rainbowSweep 1.5s ease forwards;
+    }
+    @keyframes rainbowSweep {
+      0% { left: -60%; opacity: 0; }
+      8% { opacity: 0.9; }
+      92% { opacity: 0.9; }
+      100% { left: 100%; opacity: 0; }
+    }
+
+    .footer {
+      margin-top: 32px;
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.5px;
+    }
+
+    @media (max-width: 400px) {
+      .card { padding: 36px 20px; }
+      .name { font-size: 28px; }
+      .discord-banner { height: 100px; }
+    }
+  </style>
+<base target="_blank">
+</head>
+<body>
+
+  <canvas id="trail-canvas"></canvas>
+  <div id="spotlight"></div>
+
+  <div class="card">
+    <div class="avatar-wrap">
+      <div class="avatar-ring">
+        <img class="avatar-img" src="https://cdn.discordapp.com/avatars/358071516367159298/5e80edacf5db8e1442e9663b673b3af3.png?size=512" alt="vqfc" draggable="false">
+      </div>
+    </div>
+
+    <div class="name">vqfc</div>
+    <div class="handle">developer & builder</div>
+
+    <div class="badges">
+      <div class="badge badge-owner" data-label="Owner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </div>
+      <div class="badge badge-dev" data-label="Developer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 18 22 12 16 6"/>
+          <polyline points="8 6 2 12 8 18"/>
+        </svg>
+      </div>
+      <div class="badge badge-vip" data-label="VIP">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+      </div>
+      <div class="badge badge-verified" data-label="Verified">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      </div>
+    </div>
+
+    <a class="discord-link" href="https://discord.com/users/358071516367159298" target="_blank" rel="noopener">
+      <div class="discord-section">
+        <div class="discord-banner">
+          <img src="https://cdn.discordapp.com/banners/358071516367159298/8528877114e64688fe28bb065458c884.png?size=1024" alt="" draggable="false">
+        </div>
+        <div class="discord-body">
+          <div class="discord-avatar-wrap">
+            <img class="discord-avatar" src="https://cdn.discordapp.com/avatars/358071516367159298/5e80edacf5db8e1442e9663b673b3af3.png?size=512" alt="vqfc" draggable="false">
+            <div class="discord-status"></div>
+          </div>
+          <div class="discord-name">vqfc</div>
+          <div class="discord-username">@vqfc</div>
+          <div class="discord-divider"></div>
+          <div class="discord-id-row">
+            <span class="discord-id-label">Discord ID</span>
+            <span class="discord-id-value">358071516367159298</span>
+          </div>
+        </div>
+      </div>
+    </a>
+
+    <div class="links">
+      <button class="link-btn" onclick="triggerRainbow(this)">
+        <span class="sweep"></span>
+        Placeholder Button
+      </button>
+      <button class="link-btn" onclick="triggerRainbow(this)">
+        <span class="sweep"></span>
+        Placeholder Button
+      </button>
+      <button class="link-btn" onclick="triggerRainbow(this)">
+        <span class="sweep"></span>
+        Placeholder Button
+      </button>
+      <button class="link-btn" onclick="triggerRainbow(this)">
+        <span class="sweep"></span>
+        Placeholder Button
+      </button>
+    </div>
+
+    <div class="footer">vqfc</div>
+  </div>
+
+  <script>
+    function triggerRainbow(btn) {
+      btn.classList.remove('rainbow');
+      void btn.offsetWidth;
+      btn.classList.add('rainbow');
+      setTimeout(() => btn.classList.remove('rainbow'), 1600);
+    }
+
+    const spotlight = document.getElementById('spotlight');
+    document.addEventListener('mousemove', (e) => {
+      spotlight.style.setProperty('--mx', e.clientX + 'px');
+      spotlight.style.setProperty('--my', e.clientY + 'px');
+    });
+
+    const canvas = document.getElementById('trail-canvas');
+    const ctx = canvas.getContext('2d');
+    let w, h;
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    const particles = [];
+    const maxParticles = 60;
+
+    class Particle {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = Math.random() * 2.5 + 0.5;
+        this.speedX = (Math.random() - 0.5) * 1.5;
+        this.speedY = (Math.random() - 0.5) * 1.5;
+        this.life = 1;
+        this.decay = Math.random() * 0.015 + 0.008;
+      }
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.life -= this.decay;
+        this.size *= 0.98;
+      }
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${this.life * 0.4})`;
+        ctx.fill();
+      }
+    }
+
+    document.addEventListener('mousemove', (e) => {
+      for (let i = 0; i < 3; i++) {
+        particles.push(new Particle(
+          e.clientX + (Math.random() - 0.5) * 10,
+          e.clientY + (Math.random() - 0.5) * 10
+        ));
+      }
+    });
+
+    setInterval(() => {
+      if (particles.length < maxParticles) {
+        particles.push(new Particle(Math.random() * w, Math.random() * h));
+      }
+    }, 200);
+
+    function animate() {
+      ctx.clearRect(0, 0, w, h);
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.update();
+        p.draw();
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 120) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.06 * (1 - dist / 120)})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+    animate();
+  </script>
+
+</body>
+</html>
